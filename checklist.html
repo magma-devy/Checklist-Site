@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Checklists</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root[data-theme="dark"] {
+      --bg:          #0f0d14;
+      --surface:     #1a1625;
+      --surface2:    #231e30;
+      --border:      #2e2840;
+      --text:        #ede8f5;
+      --text-muted:  #7b6f99;
+      --accent:      #a07cff;
+      --accent-soft: #7c5cd6;
+      --accent-glow: rgba(160,124,255,0.18);
+      --prog-bg:     #231e30;
+      --delete:      #ff6b8a;
+      --check-bg:    #1a1625;
+      --shadow:      0 8px 32px rgba(0,0,0,0.5);
+      --grad:        linear-gradient(135deg,#1a1130 0%,#0f0d14 60%);
+      --folder-hue:  linear-gradient(135deg,#2a1f40,#1e1830);
+    }
+    :root[data-theme="light"] {
+      --bg:          #f4f0fb;
+      --surface:     #ffffff;
+      --surface2:    #ede8f8;
+      --border:      #d9d0f0;
+      --text:        #1e1630;
+      --text-muted:  #8070aa;
+      --accent:      #7c44e8;
+      --accent-soft: #9460f5;
+      --accent-glow: rgba(124,68,232,0.12);
+      --prog-bg:     #e2d9f5;
+      --delete:      #e03060;
+      --check-bg:    #f4f0fb;
+      --shadow:      0 8px 32px rgba(90,60,180,0.10);
+      --grad:        linear-gradient(135deg,#ede8f8 0%,#f4f0fb 60%);
+      --folder-hue:  linear-gradient(135deg,#ede0ff,#f4f0fb);
+    }
+
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    body {
+      font-family:'DM Sans',sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;
+      padding:40px 16px 80px;transition:background .35s,color .35s;
+      background-image:var(--grad);background-attachment:fixed;
+    }
+    body::before {
+      content:'';position:fixed;inset:0;
+      background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);
+      background-size:28px 28px;opacity:.35;pointer-events:none;z-index:0;
+    }
+
+    .page{display:none}
+    .page.active{display:block}
+
+    .container{position:relative;z-index:1;width:100%;max-width:680px;margin:0 auto}
+
+    /* ── Top bar ── */
+    .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;gap:12px}
+    .top-bar-left{display:flex;align-items:center;gap:12px;min-width:0}
+
+    .btn-back{
+      background:var(--surface2);border:1.5px solid var(--border);
+      border-radius:10px;padding:7px 12px;cursor:pointer;font-size:.85rem;
+      font-family:'DM Sans',sans-serif;color:var(--text-muted);
+      display:flex;align-items:center;gap:5px;white-space:nowrap;
+      transition:border-color .2s,color .2s;flex-shrink:0;
+    }
+    .btn-back:hover{border-color:var(--accent);color:var(--accent)}
+
+    .page-title{
+      font-family:'DM Serif Display',serif;
+      font-size:clamp(1.6rem,5vw,2.6rem);line-height:1;
+      background:linear-gradient(120deg,var(--accent) 0%,#d3aaff 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      background-clip:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .page-sub{font-size:.82rem;color:var(--text-muted);margin-top:4px;letter-spacing:.04em}
+
+    .theme-toggle{
+      background:var(--surface2);border:1.5px solid var(--border);
+      border-radius:50px;padding:6px 14px;cursor:pointer;
+      display:flex;align-items:center;gap:7px;font-size:.78rem;
+      font-family:'DM Sans',sans-serif;color:var(--text-muted);font-weight:500;
+      transition:background .2s,color .2s,border-color .2s;letter-spacing:.03em;flex-shrink:0;
+    }
+    .theme-toggle:hover{border-color:var(--accent);color:var(--accent)}
+    .theme-toggle .icon{font-size:1rem;transition:transform .4s}
+    .theme-toggle:hover .icon{transform:rotate(20deg)}
+
+    /* ── Context menu ── */
+    .ctx-menu{
+      position:fixed;z-index:1000;background:var(--surface);
+      border:1.5px solid var(--border);border-radius:12px;padding:6px;
+      box-shadow:0 12px 40px rgba(0,0,0,.4);min-width:160px;
+      animation:ctx-in .12s ease both;
+    }
+    @keyframes ctx-in{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+    .ctx-item{
+      display:flex;align-items:center;gap:9px;padding:8px 12px;
+      border-radius:8px;cursor:pointer;font-size:.85rem;color:var(--text-muted);
+      transition:background .15s,color .15s;
+    }
+    .ctx-item:hover{background:var(--surface2);color:var(--text)}
+    .ctx-item.danger:hover{background:rgba(255,107,138,.1);color:var(--delete)}
+    .ctx-sep{height:1px;background:var(--border);margin:4px 0}
+
+    /* ── Modal ── */
+    .modal-backdrop{
+      display:none;position:fixed;inset:0;z-index:900;
+      background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
+      align-items:center;justify-content:center;
+    }
+    .modal-backdrop.open{display:flex}
+    .modal{
+      background:var(--surface);border:1.5px solid var(--border);
+      border-radius:20px;padding:28px 28px 24px;width:100%;max-width:420px;
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+      animation:modal-in .2s cubic-bezier(.4,0,.2,1) both;
+    }
+    @keyframes modal-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .modal h2{font-family:'DM Serif Display',serif;font-size:1.4rem;margin-bottom:16px;color:var(--text)}
+    .modal input{
+      width:100%;background:var(--surface2);border:1.5px solid var(--border);
+      border-radius:10px;padding:10px 14px;font-size:.95rem;
+      font-family:'DM Sans',sans-serif;color:var(--text);outline:none;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .modal input::placeholder{color:var(--text-muted)}
+    .modal input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end}
+    .btn-primary{
+      background:linear-gradient(135deg,var(--accent-soft),var(--accent));
+      border:none;border-radius:10px;padding:9px 22px;font-size:.88rem;
+      font-family:'DM Sans',sans-serif;color:#fff;cursor:pointer;font-weight:500;
+      transition:transform .15s,box-shadow .2s;box-shadow:0 2px 12px var(--accent-glow);
+    }
+    .btn-primary:hover{transform:scale(1.04);box-shadow:0 4px 20px var(--accent-glow)}
+    .btn-cancel{
+      background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;
+      padding:9px 18px;font-size:.88rem;font-family:'DM Sans',sans-serif;
+      color:var(--text-muted);cursor:pointer;transition:border-color .2s,color .2s;
+    }
+    .btn-cancel:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* ════════ HOME ════════ */
+    .home-actions{display:flex;gap:10px;margin-bottom:28px;flex-wrap:wrap}
+    .btn-new{
+      background:linear-gradient(135deg,var(--accent-soft),var(--accent));
+      border:none;border-radius:12px;padding:10px 20px;font-size:.88rem;
+      font-family:'DM Sans',sans-serif;color:#fff;cursor:pointer;font-weight:500;
+      display:flex;align-items:center;gap:7px;
+      box-shadow:0 2px 12px var(--accent-glow);transition:transform .15s,box-shadow .2s;
+    }
+    .btn-new:hover{transform:scale(1.04);box-shadow:0 4px 20px var(--accent-glow)}
+    .btn-new-ghost{
+      background:var(--surface);border:1.5px solid var(--border);border-radius:12px;
+      padding:10px 20px;font-size:.88rem;font-family:'DM Sans',sans-serif;
+      color:var(--text-muted);cursor:pointer;font-weight:500;
+      display:flex;align-items:center;gap:7px;transition:border-color .2s,color .2s;
+    }
+    .btn-new-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+    #folders-container{display:flex;flex-direction:column;gap:20px}
+
+    .folder-block{
+      background:var(--surface);border:1.5px solid var(--border);
+      border-radius:20px;overflow:hidden;box-shadow:var(--shadow);
+      animation:slide-in .25s cubic-bezier(.4,0,.2,1) both;
+    }
+    .folder-header{
+      display:flex;align-items:center;gap:12px;padding:14px 16px;
+      cursor:pointer;background:var(--folder-hue);
+      border-bottom:1.5px solid var(--border);transition:filter .18s;user-select:none;
+    }
+    .folder-header:hover{filter:brightness(1.08)}
+    .folder-icon{font-size:1.1rem;flex-shrink:0}
+    .folder-chevron{
+      margin-left:auto;font-size:.75rem;color:var(--text-muted);
+      transition:transform .2s;flex-shrink:0;
+    }
+    .folder-block.open .folder-chevron{transform:rotate(90deg)}
+    .folder-name-wrap{flex:1;min-width:0}
+    .folder-name{font-weight:600;font-size:.98rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .folder-meta{font-size:.74rem;color:var(--text-muted);margin-top:1px}
+    .folder-dot-btn{
+      background:none;border:none;cursor:pointer;padding:4px 8px;
+      font-size:.95rem;color:var(--text-muted);border-radius:7px;
+      transition:background .15s,color .15s;flex-shrink:0;
+    }
+    .folder-dot-btn:hover{background:var(--surface2);color:var(--accent)}
+
+    .folder-body{display:none;padding:10px 12px 12px}
+    .folder-block.open .folder-body{display:block}
+
+    .cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:12px}
+    .cl-card{
+      background:var(--surface2);border:1.5px solid var(--border);
+      border-radius:14px;padding:14px 14px 12px;cursor:pointer;
+      transition:border-color .18s,background .18s,transform .15s;
+      position:relative;min-height:82px;display:flex;flex-direction:column;
+      animation:slide-in .2s cubic-bezier(.4,0,.2,1) both;
+    }
+    .cl-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+    .cl-card-name{font-weight:600;font-size:.9rem;color:var(--text);word-break:break-word;line-height:1.35;flex:1;padding-right:20px}
+    .cl-card-meta{font-size:.72rem;color:var(--text-muted);margin-top:8px}
+    .cl-card-prog{height:3px;background:var(--prog-bg);border-radius:99px;overflow:hidden;margin-top:8px}
+    .cl-card-prog-fill{
+      height:100%;border-radius:99px;
+      background:linear-gradient(90deg,var(--accent-soft),var(--accent));transition:width .4s;
+    }
+    .cl-card-dot-btn{
+      position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;
+      font-size:.85rem;color:var(--text-muted);border-radius:6px;padding:2px 6px;
+      transition:background .15s,color .15s;opacity:0;
+    }
+    .cl-card:hover .cl-card-dot-btn{opacity:1}
+    .cl-card-dot-btn:hover{background:var(--border);color:var(--accent)}
+
+    .btn-add-cl{
+      background:none;border:1.5px dashed var(--border);border-radius:12px;
+      padding:9px 16px;width:100%;font-size:.82rem;font-family:'DM Sans',sans-serif;
+      color:var(--text-muted);cursor:pointer;transition:border-color .2s,color .2s;
+      display:flex;align-items:center;justify-content:center;gap:7px;
+    }
+    .btn-add-cl:hover{border-color:var(--accent);color:var(--accent)}
+
+    .home-empty{text-align:center;padding:60px 24px;color:var(--text-muted)}
+    .home-empty .e-icon{font-size:2.8rem;opacity:.3;margin-bottom:12px}
+    .home-empty p{font-size:.9rem;line-height:1.6}
+
+    @keyframes slide-in{
+      from{opacity:0;transform:translateY(-8px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+
+    /* ════════ CHECKLIST PAGE ════════ */
+    .progress-wrap{
+      background:var(--surface);border:1.5px solid var(--border);
+      border-radius:16px;padding:18px 20px 16px;margin-bottom:20px;box-shadow:var(--shadow);
+    }
+    .progress-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+    .progress-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);font-weight:600}
+    .progress-count{font-family:'DM Serif Display',serif;font-size:1.15rem;color:var(--accent)}
+    .progress-track{height:8px;background:var(--prog-bg);border-radius:99px;overflow:hidden}
+    .progress-fill{
+      height:100%;border-radius:99px;
+      background:linear-gradient(90deg,var(--accent-soft),var(--accent),#d3aaff);
+      transition:width .5s cubic-bezier(.4,0,.2,1);
+      box-shadow:0 0 10px var(--accent-glow);min-width:0;
+    }
+
+    .card{background:var(--surface);border:1.5px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:var(--shadow)}
+    .add-row{display:flex;gap:10px;padding:16px 16px 14px;border-bottom:1.5px solid var(--border)}
+    .add-row input{
+      flex:1;background:var(--surface2);border:1.5px solid var(--border);
+      border-radius:10px;padding:10px 14px;font-size:.92rem;
+      font-family:'DM Sans',sans-serif;color:var(--text);outline:none;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .add-row input::placeholder{color:var(--text-muted)}
+    .add-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .btn-add{
+      background:linear-gradient(135deg,var(--accent-soft),var(--accent));
+      border:none;border-radius:10px;padding:10px 18px;font-size:1.25rem;color:#fff;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:transform .15s,box-shadow .2s;box-shadow:0 2px 12px var(--accent-glow);min-width:44px;
+    }
+    .btn-add:hover{transform:scale(1.08);box-shadow:0 4px 20px var(--accent-glow)}
+    .btn-add:active{transform:scale(.96)}
+
+    #item-list{list-style:none}
+    .item{
+      display:flex;align-items:center;gap:12px;padding:13px 16px;
+      border-bottom:1px solid var(--border);transition:background .18s;cursor:pointer;
+    }
+    .item.is-new{animation:slide-in .25s cubic-bezier(.4,0,.2,1) both}
+    .item:last-child{border-bottom:none}
+    .item:hover{background:var(--surface2)}
+
+    .item-check{
+      appearance:none;width:20px;height:20px;border-radius:6px;
+      border:2px solid var(--border);background:var(--check-bg);
+      cursor:pointer;flex-shrink:0;position:relative;
+      transition:border-color .2s,background .2s,box-shadow .2s;
+    }
+    .item-check:hover{border-color:var(--accent)}
+    .item-check:checked{
+      background:linear-gradient(135deg,var(--accent-soft),var(--accent));
+      border-color:var(--accent);box-shadow:0 0 8px var(--accent-glow);
+    }
+    .item-check:checked::after{
+      content:'';position:absolute;top:3px;left:6px;width:5px;height:9px;
+      border:2px solid #fff;border-top:none;border-left:none;transform:rotate(45deg);
+    }
+
+    .item-label{
+      flex:1;font-size:.95rem;color:var(--text);cursor:pointer;
+      border-radius:6px;padding:3px 6px;margin:-3px -6px;
+      line-height:1.45;transition:color .2s;word-break:break-word;
+    }
+    .item.done .item-label{color:var(--text-muted);text-decoration:line-through;text-decoration-color:var(--accent-soft)}
+    .item-edit-input{
+      flex:1;background:var(--surface2);border:1.5px solid var(--accent);
+      border-radius:8px;padding:4px 10px;font-size:.95rem;
+      font-family:'DM Sans',sans-serif;color:var(--text);outline:none;
+      box-shadow:0 0 0 3px var(--accent-glow);
+    }
+
+    .item-actions{display:flex;gap:4px;opacity:0;transition:opacity .18s}
+    .item:hover .item-actions,.item:focus-within .item-actions{opacity:1}
+    .btn-icon{
+      background:none;border:none;cursor:pointer;width:30px;height:30px;
+      border-radius:7px;display:flex;align-items:center;justify-content:center;
+      font-size:.88rem;transition:background .15s,color .15s;color:var(--text-muted);
+    }
+    .btn-rename:hover{background:var(--accent-glow);color:var(--accent)}
+    .btn-delete:hover{background:rgba(255,107,138,.12);color:var(--delete)}
+
+    .empty{padding:40px 24px;text-align:center}
+    .empty-icon{font-size:2.5rem;margin-bottom:10px;opacity:.4}
+    .empty p{color:var(--text-muted);font-size:.88rem;line-height:1.6}
+
+    .footer-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+    .btn-ghost{
+      background:var(--surface);border:1.5px solid var(--border);border-radius:9px;
+      padding:7px 16px;font-size:.78rem;font-family:'DM Sans',sans-serif;
+      color:var(--text-muted);cursor:pointer;font-weight:500;letter-spacing:.03em;
+      transition:border-color .2s,color .2s;
+    }
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-ghost.danger:hover{border-color:var(--delete);color:var(--delete)}
+
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+  </style>
+</head>
+<body>
+
+<!-- ══ HOME ══ -->
+<div id="page-home" class="page active">
+  <div class="container">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div>
+          <div class="page-title">My Lists</div>
+          <div class="page-sub" id="home-sub"></div>
+        </div>
+      </div>
+      <button class="theme-toggle" id="theme-btn-home">
+        <span class="icon" id="theme-icon-home">☀️</span>
+        <span id="theme-label-home">Light</span>
+      </button>
+    </div>
+    <div class="home-actions">
+      <button class="btn-new" id="btn-new-folder">＋ New Folder</button>
+      <button class="btn-new-ghost" id="btn-new-loose-cl">＋ New Checklist</button>
+    </div>
+    <div id="folders-container"></div>
+    <div class="home-empty" id="home-empty" style="display:none">
+      <div class="e-icon">✦</div>
+      <p>No checklists yet.<br>Create a folder or add a checklist to get started.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CHECKLIST ══ -->
+<div id="page-checklist" class="page">
+  <div class="container">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <button class="btn-back" id="btn-back">← Back</button>
+        <div>
+          <div class="page-title" id="cl-page-title"></div>
+          <div class="page-sub" id="cl-page-sub"></div>
+        </div>
+      </div>
+      <button class="theme-toggle" id="theme-btn-cl">
+        <span class="icon" id="theme-icon-cl">☀️</span>
+        <span id="theme-label-cl">Light</span>
+      </button>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-meta">
+        <span class="progress-label">Progress</span>
+        <span class="progress-count" id="progress-count">0 / 0</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="new-item-input" placeholder="Add a new task…" maxlength="200" autocomplete="off"/>
+        <button class="btn-add" id="add-btn">＋</button>
+      </div>
+      <ul id="item-list"></ul>
+      <div class="empty" id="empty-state">
+        <div class="empty-icon">✦</div>
+        <p>No tasks yet.<br>Add something above to get started.</p>
+      </div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn-ghost danger" id="clear-done-btn">Clear completed</button>
+      <button class="btn-ghost danger" id="clear-all-btn">Clear all</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ══ -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h2 id="modal-title">New Folder</h2>
+    <input type="text" id="modal-input" placeholder="Name…" maxlength="80" autocomplete="off"/>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-primary" id="modal-confirm">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONTEXT MENU ══ -->
+<div class="ctx-menu" id="ctx-menu" style="display:none"></div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────
+// state.folders = [{ id, name, checklists:[{id, name, items:[{id,text,done}]}] }]
+// Loose (unfiled) checklists live in the folder with id='__loose__'
+const STORE_KEY = 'checklists_app_v1';
+const THEME_KEY = 'checklist_theme';
+let state = { folders: [] };
+
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch { state = { folders: [] }; }
+  if (!state.folders.find(f => f.id === '__loose__'))
+    state.folders.unshift({ id:'__loose__', name:'__loose__', checklists:[] });
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function getFolder(fid) { return state.folders.find(f => f.id === fid); }
+function getCL(fid, clid) { const f = getFolder(fid); return f && f.checklists.find(c => c.id === clid); }
+
+// ── Theme ─────────────────────────────────────────────────────────
+let theme = localStorage.getItem(THEME_KEY) || 'dark';
+function applyTheme(t) {
+  theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem(THEME_KEY, t);
+  ['home','cl'].forEach(k => {
+    const icon  = document.getElementById('theme-icon-'  + k);
+    const label = document.getElementById('theme-label-' + k);
+    if (icon)  icon.textContent  = t === 'dark' ? '☀️' : '🌙';
+    if (label) label.textContent = t === 'dark' ? 'Light' : 'Dark';
+  });
+}
+document.getElementById('theme-btn-home').addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
+document.getElementById('theme-btn-cl')  .addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
+
+// ── Modal ─────────────────────────────────────────────────────────
+let modalCb = null;
+function openModal(title, placeholder, def, confirmTxt, cb) {
+  document.getElementById('modal-title').textContent   = title;
+  document.getElementById('modal-input').placeholder   = placeholder;
+  document.getElementById('modal-input').value         = def || '';
+  document.getElementById('modal-confirm').textContent = confirmTxt || 'OK';
+  modalCb = cb;
+  document.getElementById('modal-backdrop').classList.add('open');
+  setTimeout(() => { const i = document.getElementById('modal-input'); i.focus(); i.select(); }, 50);
+}
+function closeModal() { document.getElementById('modal-backdrop').classList.remove('open'); modalCb = null; }
+document.getElementById('modal-cancel') .addEventListener('click', closeModal);
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  const v = document.getElementById('modal-input').value.trim();
+  if (!v) return;
+  if (modalCb) modalCb(v);
+  closeModal();
+});
+document.getElementById('modal-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter')  document.getElementById('modal-confirm').click();
+  if (e.key === 'Escape') closeModal();
+});
+document.getElementById('modal-backdrop').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal();
+});
+
+// ── Context menu ──────────────────────────────────────────────────
+const ctxEl = document.getElementById('ctx-menu');
+function openCtx(x, y, items) {
+  ctxEl.innerHTML = '';
+  items.forEach(it => {
+    if (it === 'sep') { const s = document.createElement('div'); s.className='ctx-sep'; ctxEl.appendChild(s); return; }
+    const el = document.createElement('div');
+    el.className = 'ctx-item' + (it.danger ? ' danger' : '');
+    el.textContent = it.label;
+    el.addEventListener('click', () => { closeCtx(); it.action(); });
+    ctxEl.appendChild(el);
+  });
+  ctxEl.style.display = 'block';
+  const mw=170, mh=ctxEl.offsetHeight||120, vw=window.innerWidth, vh=window.innerHeight;
+  ctxEl.style.left = Math.min(x, vw-mw-8)+'px';
+  ctxEl.style.top  = Math.min(y, vh-mh-8)+'px';
+}
+function closeCtx() { ctxEl.style.display = 'none'; }
+document.addEventListener('click', e => { if (!ctxEl.contains(e.target)) closeCtx(); });
+
+// ── Navigation ────────────────────────────────────────────────────
+let curFid=null, curClid=null, editingItemId=null;
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function openChecklist(fid, clid) {
+  curFid=fid; curClid=clid; editingItemId=null;
+  const cl=getCL(fid,clid), fol=getFolder(fid);
+  if (!cl) return;
+  document.getElementById('cl-page-title').textContent = cl.name;
+  document.getElementById('cl-page-sub').textContent   = fid==='__loose__' ? '' : 'in '+fol.name;
+  renderChecklist();
+  showPage('page-checklist');
+}
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  showPage('page-home'); renderHome();
+});
+
+// ── Home render ───────────────────────────────────────────────────
+function renderHome() {
+  document.getElementById('home-sub').textContent =
+    new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  const cont = document.getElementById('folders-container');
+  cont.innerHTML = '';
+
+  const loose = getFolder('__loose__');
+  const real  = state.folders.filter(f => f.id !== '__loose__');
+
+  if (loose && loose.checklists.length > 0) cont.appendChild(buildFolderBlock(loose, true));
+  real.forEach(f => cont.appendChild(buildFolderBlock(f, false)));
+
+  const empty = real.length === 0 && (!loose || loose.checklists.length === 0);
+  document.getElementById('home-empty').style.display = empty ? 'block' : 'none';
+}
+
+function buildFolderBlock(folder, isLoose) {
+  const block = document.createElement('div');
+  block.className = 'folder-block open';
+  block.dataset.fid = folder.id;
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'folder-header';
+  if (isLoose) header.style.cursor = 'default';
+
+  const iconEl = document.createElement('span');
+  iconEl.className = 'folder-icon';
+  iconEl.textContent = isLoose ? '📋' : '📁';
+
+  const nameWrap = document.createElement('div');
+  nameWrap.className = 'folder-name-wrap';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'folder-name';
+  nameEl.textContent = isLoose ? 'Unfiled Checklists' : folder.name;
+
+  nameWrap.appendChild(nameEl);
+
+  if (!isLoose) {
+    const metaEl = document.createElement('div');
+    metaEl.className = 'folder-meta';
+    const n = folder.checklists.length;
+    metaEl.textContent = n + ' checklist' + (n !== 1 ? 's' : '');
+    nameWrap.appendChild(metaEl);
+
+    const chevron = document.createElement('span');
+    chevron.className = 'folder-chevron'; chevron.textContent = '▶';
+
+    const dotBtn = document.createElement('button');
+    dotBtn.className = 'folder-dot-btn'; dotBtn.textContent = '•••';
+    dotBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const r = dotBtn.getBoundingClientRect();
+      openCtx(r.left, r.bottom+4, [
+        { label:'✎  Rename',        action:() => renameFolder(folder.id) },
+        'sep',
+        { label:'✕  Delete folder', danger:true, action:() => deleteFolder(folder.id) }
+      ]);
+    });
+
+    header.addEventListener('click', () => block.classList.toggle('open'));
+    header.appendChild(iconEl);
+    header.appendChild(nameWrap);
+    header.appendChild(chevron);
+    header.appendChild(dotBtn);
+  } else {
+    header.appendChild(iconEl);
+    header.appendChild(nameWrap);
+  }
+
+  block.appendChild(header);
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'folder-body';
+
+  const grid = document.createElement('div');
+  grid.className = 'cl-grid';
+  folder.checklists.forEach(cl => grid.appendChild(buildClCard(folder.id, cl)));
+  body.appendChild(grid);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-cl';
+  addBtn.innerHTML = '＋ Add checklist';
+  addBtn.addEventListener('click', () => {
+    openModal('New Checklist','Checklist name…','','Create', name => {
+      addChecklist(folder.id, name);
+    });
+  });
+  body.appendChild(addBtn);
+  block.appendChild(body);
+  return block;
+}
+
+function buildClCard(fid, cl) {
+  const card = document.createElement('div');
+  card.className = 'cl-card';
+
+  const total = cl.items.length;
+  const done  = cl.items.filter(i => i.done).length;
+  const pct   = total === 0 ? 0 : Math.round((done/total)*100);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'cl-card-name'; nameEl.textContent = cl.name;
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'cl-card-meta';
+  metaEl.textContent = total === 0 ? 'Empty' : done+' / '+total+' done';
+
+  const prog = document.createElement('div'); prog.className = 'cl-card-prog';
+  const fill = document.createElement('div'); fill.className = 'cl-card-prog-fill';
+  fill.style.width = pct+'%'; prog.appendChild(fill);
+
+  const dot = document.createElement('button');
+  dot.className = 'cl-card-dot-btn'; dot.textContent = '•••';
+  dot.addEventListener('click', e => {
+    e.stopPropagation();
+    const r = dot.getBoundingClientRect();
+    openCtx(r.left, r.bottom+4, [
+      { label:'✎  Rename', action:() => renameChecklist(fid, cl.id) },
+      'sep',
+      { label:'✕  Delete', danger:true, action:() => deleteChecklist(fid, cl.id) }
+    ]);
+  });
+
+  card.appendChild(dot);
+  card.appendChild(nameEl);
+  card.appendChild(metaEl);
+  card.appendChild(prog);
+  card.addEventListener('click', () => openChecklist(fid, cl.id));
+  return card;
+}
+
+// ── Home actions ──────────────────────────────────────────────────
+document.getElementById('btn-new-folder').addEventListener('click', () => {
+  openModal('New Folder','Folder name…','','Create', name => {
+    state.folders.push({ id:uid(), name, checklists:[] });
+    save(); renderHome();
+  });
+});
+document.getElementById('btn-new-loose-cl').addEventListener('click', () => {
+  openModal('New Checklist','Checklist name…','','Create', name => addChecklist('__loose__', name));
+});
+
+function addChecklist(fid, name) {
+  const f = getFolder(fid); if (!f) return;
+  f.checklists.push({ id:uid(), name, items:[] });
+  save(); renderHome();
+}
+function renameFolder(fid) {
+  const f = getFolder(fid); if (!f) return;
+  openModal('Rename Folder','Folder name…', f.name,'Save', name => { f.name=name; save(); renderHome(); });
+}
+function deleteFolder(fid) {
+  if (!confirm('Delete this folder and all its checklists?')) return;
+  state.folders = state.folders.filter(f => f.id !== fid);
+  save(); renderHome();
+}
+function renameChecklist(fid, clid) {
+  const cl = getCL(fid, clid); if (!cl) return;
+  openModal('Rename Checklist','Checklist name…', cl.name,'Save', name => {
+    cl.name = name; save(); renderHome();
+    if (curClid === clid) document.getElementById('cl-page-title').textContent = name;
+  });
+}
+function deleteChecklist(fid, clid) {
+  if (!confirm('Delete this checklist?')) return;
+  const f = getFolder(fid); if (!f) return;
+  f.checklists = f.checklists.filter(c => c.id !== clid);
+  save(); renderHome();
+}
+
+// ── Checklist page ────────────────────────────────────────────────
+function curCl() { return getCL(curFid, curClid); }
+
+function buildItem(item, animate) {
+  const li = document.createElement('li');
+  li.className = 'item'+(item.done?' done':'')+(animate?' is-new':'');
+  li.dataset.id = item.id;
+  li.addEventListener('click', () => toggleItem(item.id));
+
+  const cb = document.createElement('input');
+  cb.type='checkbox'; cb.className='item-check'; cb.checked=item.done;
+  cb.addEventListener('click', e => e.stopPropagation());
+
+  const lbl = document.createElement('span');
+  lbl.className='item-label'; lbl.textContent=item.text;
+  lbl.title='Double-click to rename';
+  lbl.addEventListener('dblclick', e => { e.stopPropagation(); startItemEdit(item.id); });
+
+  const acts = document.createElement('div'); acts.className='item-actions';
+
+  const ren = document.createElement('button');
+  ren.className='btn-icon btn-rename'; ren.title='Rename'; ren.textContent='✎';
+  ren.addEventListener('click', e => { e.stopPropagation(); startItemEdit(item.id); });
+
+  const del = document.createElement('button');
+  del.className='btn-icon btn-delete'; del.title='Delete'; del.textContent='✕';
+  del.addEventListener('click', e => { e.stopPropagation(); deleteItem(item.id); });
+
+  acts.appendChild(ren); acts.appendChild(del);
+  li.appendChild(cb); li.appendChild(lbl); li.appendChild(acts);
+  return li;
+}
+
+function renderChecklist() {
+  const cl = curCl(); if (!cl) return;
+  const listEl = document.getElementById('item-list');
+  listEl.innerHTML = '';
+  document.getElementById('empty-state').style.display = cl.items.length===0?'block':'none';
+  cl.items.forEach(it => listEl.appendChild(buildItem(it, false)));
+  updateProgress();
+}
+
+function updateProgress() {
+  const cl = curCl(); if (!cl) return;
+  const total=cl.items.length, done=cl.items.filter(i=>i.done).length;
+  const pct = total===0?0:Math.round((done/total)*100);
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('progress-count').textContent = done+' / '+total;
+}
+
+function addItem() {
+  const inp = document.getElementById('new-item-input');
+  const text = inp.value.trim(); if (!text) return;
+  const cl = curCl(); if (!cl) return;
+  const item = { id:uid(), text, done:false };
+  cl.items.push(item); inp.value='';
+  save();
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('item-list').appendChild(buildItem(item,true));
+  updateProgress();
+}
+
+function toggleItem(id) {
+  const cl=curCl(); if(!cl) return;
+  const item=cl.items.find(i=>i.id===id); if(!item) return;
+  item.done=!item.done; save();
+  const li=document.getElementById('item-list').querySelector('[data-id="'+id+'"]');
+  if(li){ li.classList.toggle('done',item.done); li.querySelector('.item-check').checked=item.done; }
+  updateProgress();
+}
+
+function deleteItem(id) {
+  const cl=curCl(); if(!cl) return;
+  cl.items=cl.items.filter(i=>i.id!==id);
+  if(editingItemId===id) editingItemId=null;
+  save();
+  const li=document.getElementById('item-list').querySelector('[data-id="'+id+'"]');
+  if(li) li.remove();
+  document.getElementById('empty-state').style.display=cl.items.length===0?'block':'none';
+  updateProgress();
+}
+
+function startItemEdit(id) {
+  if(editingItemId && editingItemId!==id) commitItemEdit(editingItemId,null);
+  editingItemId=id;
+  const cl=curCl(); if(!cl) return;
+  const item=cl.items.find(i=>i.id===id); if(!item) return;
+  const li=document.getElementById('item-list').querySelector('[data-id="'+id+'"]'); if(!li) return;
+  const lbl=li.querySelector('.item-label');
+  const inp=document.createElement('input');
+  inp.type='text'; inp.className='item-edit-input'; inp.value=item.text; inp.maxLength=200;
+  inp.addEventListener('click', e=>e.stopPropagation());
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter')  commitItemEdit(id,inp.value);
+    if(e.key==='Escape') cancelItemEdit(id);
+  });
+  inp.addEventListener('blur', ()=>commitItemEdit(id,inp.value));
+  lbl.replaceWith(inp);
+  setTimeout(()=>{ inp.focus(); inp.select(); },0);
+}
+
+function commitItemEdit(id,value) {
+  editingItemId=null;
+  const cl=curCl(); if(!cl) return;
+  const item=cl.items.find(i=>i.id===id); if(!item) return;
+  const li=document.getElementById('item-list').querySelector('[data-id="'+id+'"]'); if(!li) return;
+  const inp=li.querySelector('.item-edit-input'); if(!inp) return;
+  const text=(value??inp.value).trim(); if(text) item.text=text;
+  save();
+  const lbl=document.createElement('span');
+  lbl.className='item-label'; lbl.textContent=item.text;
+  lbl.title='Double-click to rename';
+  lbl.addEventListener('dblclick',()=>startItemEdit(id));
+  inp.replaceWith(lbl);
+}
+
+function cancelItemEdit(id) {
+  editingItemId=null;
+  const cl=curCl(); if(!cl) return;
+  const item=cl.items.find(i=>i.id===id); if(!item) return;
+  const li=document.getElementById('item-list').querySelector('[data-id="'+id+'"]'); if(!li) return;
+  const inp=li.querySelector('.item-edit-input'); if(!inp) return;
+  const lbl=document.createElement('span');
+  lbl.className='item-label'; lbl.textContent=item.text;
+  lbl.title='Double-click to rename';
+  lbl.addEventListener('dblclick',()=>startItemEdit(id));
+  inp.replaceWith(lbl);
+}
+
+document.getElementById('add-btn').addEventListener('click', addItem);
+document.getElementById('new-item-input').addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
+
+document.getElementById('clear-done-btn').addEventListener('click', ()=>{
+  const cl=curCl(); if(!cl) return;
+  const ids=cl.items.filter(i=>i.done).map(i=>i.id);
+  cl.items=cl.items.filter(i=>!i.done); save();
+  const listEl=document.getElementById('item-list');
+  ids.forEach(id=>{ const li=listEl.querySelector('[data-id="'+id+'"]'); if(li) li.remove(); });
+  document.getElementById('empty-state').style.display=cl.items.length===0?'block':'none';
+  updateProgress();
+});
+
+document.getElementById('clear-all-btn').addEventListener('click', ()=>{
+  const cl=curCl(); if(!cl||cl.items.length===0) return;
+  if(!confirm('Delete all tasks?')) return;
+  cl.items=[]; save(); renderChecklist();
+});
+
+// ── Init ──────────────────────────────────────────────────────────
+load();
+applyTheme(theme);
+renderHome();
+</script>
+</body>
+</html>
